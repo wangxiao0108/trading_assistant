@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ document.title }}</title>
+  <link rel="stylesheet" href="/static/style.css?v=20260507-history-fill">
+</head>
+<body>
+  <main class="doc-page">
+    <aside class="doc-sidebar">
+      <a href="/" class="back">返回首页</a>
+      <div class="doc-title-block">
+        <span>{{ page_label or document.title }}</span>
+        <strong>{{ document.title }}</strong>
+      </div>
+      <nav class="doc-nav" aria-label="文档目录">
+        {% for section in document.sections %}
+          <a href="#section-{{ loop.index }}">{{ section.title }}</a>
+        {% endfor %}
+      </nav>
+    </aside>
+
+    <section class="doc-main">
+      <div class="rules-hero">
+        <h1>{{ document.title }}</h1>
+        <div class="rules-lead">{{ document.lead_html | safe }}</div>
+      </div>
+
+      <div class="rules-layout">
+        {% for section in document.sections %}
+          <section class="rules-section" id="section-{{ loop.index }}">
+            <h2>{{ section.title }}</h2>
+            {% if section.intro_html %}
+              <div class="rules-content">{{ section.intro_html | safe }}</div>
+            {% endif %}
+
+            <div class="rules-subsections">
+              {% for subsection in section.subsections %}
+                <article class="rules-subsection">
+                  <h3>{{ subsection.title }}</h3>
+                  <div class="rules-content">{{ subsection.html | safe }}</div>
+                </article>
+              {% endfor %}
+            </div>
+          </section>
+        {% endfor %}
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>交易助手</title>
+  <link rel="stylesheet" href="/static/style.css?v=20260507-history-fill">
+</head>
+<body>
+  <main class="shell">
+    <section class="panel">
+      <h1>交易助手</h1>
+      <p class="muted">输入 A 股代码，按《我的交易系统V1》进行日线级规则分析。</p>
+      <div class="home-actions">
+        <a class="secondary-link" href="/rules">查看详细交易系统准则</a>
+        <a class="secondary-link" href="/strategy/520">查看520战法详解</a>
+      </div>
+      <form method="post" action="/analyze" class="form home-form" id="analyzeForm">
+        <input id="codeInput" name="code" placeholder="例如 000001 / 600519 / 300750" autocomplete="off" required>
+        <button type="submit" id="analyzeButton">分析</button>
+      </form>
+      <div class="loading-state" id="loadingState" hidden>
+        <span class="spinner" aria-hidden="true"></span>
+        <span>正在连接数据源并生成分析结果...</span>
+      </div>
+      <div id="historyBox" class="history" hidden>
+        <div class="history-head">
+          <span>最近查询</span>
+          <button class="link-button" type="button" id="clearHistory">清空</button>
+        </div>
+        <div id="historyList" class="history-list"></div>
+      </div>
+      <p class="hint">第一版使用免费公开数据，只做规则辅助分析，不做自动交易。</p>
+    </section>
+  </main>
+  <script>
+    const historyKey = "tradingAssistantHistory";
+    const historyBox = document.getElementById("historyBox");
+    const historyList = document.getElementById("historyList");
+    const codeInput = document.getElementById("codeInput");
+    const clearHistory = document.getElementById("clearHistory");
+    const analyzeForm = document.getElementById("analyzeForm");
+    const analyzeButton = document.getElementById("analyzeButton");
+    const loadingState = document.getElementById("loadingState");
+    let submitting = false;
+
+    function readHistory() {
+      try {
+        return JSON.parse(localStorage.getItem(historyKey) || "[]");
+      } catch {
+        return [];
+      }
+    }
+
+    function renderHistory() {
+      const items = readHistory();
+      historyList.innerHTML = "";
+      historyBox.hidden = items.length === 0;
+      items.forEach((item) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "history-chip";
+        button.textContent = `${item.name || item.code} ${item.code}`;
+        button.addEventListener("click", () => {
+          codeInput.value = item.code;
+          codeInput.focus();
+        });
+        historyList.appendChild(button);
+      });
+    }
+
+    clearHistory.addEventListener("click", () => {
+      localStorage.removeItem(historyKey);
+      renderHistory();
+    });
+
+    analyzeForm.addEventListener("submit", (event) => {
+      if (submitting) {
+        event.preventDefault();
+        return;
+      }
+      submitting = true;
+      analyzeButton.disabled = true;
+      analyzeButton.textContent = "分析中...";
+      loadingState.hidden = false;
+      codeInput.readOnly = true;
+    });
+
+    renderHistory();
+  </script>
+</body>
+</html>

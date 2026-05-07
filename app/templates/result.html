@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>分析结果</title>
+  <link rel="stylesheet" href="/static/style.css?v=20260507-history-fill">
+</head>
+<body>
+  <main class="shell">
+    <section class="panel">
+      <a href="/" class="back">返回</a>
+      {% if error %}
+        <div class="error-state">
+          <h1>数据暂时没有取到</h1>
+          <p class="risk">{{ error }}</p>
+          <div class="error-actions">
+            <a class="secondary-link" href="/">重新查询</a>
+            <a class="secondary-link" href="/rules">查看交易系统准则</a>
+            <a class="secondary-link" href="/strategy/520">查看520战法详解</a>
+          </div>
+          <div class="summary">
+            第一版使用免费公开数据，东方财富或 AKShare 接口偶尔会因为网络、代理、接口限制而失败。规则页面仍可正常查看。
+          </div>
+        </div>
+      {% else %}
+        <div class="result-hero">
+          <div>
+            <h1 class="result-title">
+              {% if result.name and result.name != result.code %}
+                {{ result.name }} <span class="code">{{ result.code }}</span>
+              {% else %}
+                {{ result.code }}
+              {% endif %}
+            </h1>
+            <div class="meta">
+              <span>数据源：{{ result.source }}</span>
+              <span>K线截止：{{ result.kline_date }}</span>
+              <span>分析时间：{{ result.fetched_at }}</span>
+            </div>
+          </div>
+          <div class="risk-badge risk-{{ result.rule_result.risk_level }}">
+            风险：{{ result.rule_result.risk_level }}
+          </div>
+        </div>
+
+        <div class="summary result-summary">
+          <strong>{{ result.rule_result.conclusion }}</strong>
+        </div>
+
+        <div class="dashboard">
+          <section class="card span-2">
+            <h2>规则检查清单</h2>
+            <div class="check-grid">
+              {% for check in result.rule_result.checks %}
+                <div class="check-item">
+                  <span class="status status-{{ check.status }}">{{ check.status }}</span>
+                  <div>
+                    <strong>{{ check.name }}</strong>
+                    <p>{{ check.detail }}</p>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </section>
+
+          <section class="card span-2">
+            <h2>日K与均线</h2>
+            <canvas id="klineChart" height="260"></canvas>
+            <div class="legend">
+              <span><i class="line ma5"></i>MA5</span>
+              <span><i class="line ma13"></i>MA13</span>
+              <span><i class="line ma20"></i>MA20</span>
+              <span><i class="bar up"></i>上涨</span>
+              <span><i class="bar down"></i>下跌</span>
+            </div>
+          </section>
+
+          <section class="card">
+            <h2>基础数据</h2>
+            <ul>
+              <li>收盘价：{{ "%.2f"|format(result.latest_close) }}</li>
+              <li>涨跌幅：{% if result.latest_pct_chg is not none %}{{ "%.2f"|format(result.latest_pct_chg) }}%{% else %}-{% endif %}</li>
+              <li>MA5：{{ "%.2f"|format(result.ma5) }}</li>
+              <li>MA13：{{ "%.2f"|format(result.ma13) }}</li>
+              <li>MA20：{{ "%.2f"|format(result.ma20) }}</li>
+            </ul>
+          </section>
+
+          <section class="card">
+            <h2>市场环境</h2>
+            <ul>
+              {% for item in result.market_notes %}
+                <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          </section>
+
+          <section class="card">
+            <h2>正向条件</h2>
+            <ul>
+              {% for item in result.rule_result.positives %}
+                <li>{{ item }}</li>
+              {% else %}
+                <li>暂无。</li>
+              {% endfor %}
+            </ul>
+          </section>
+
+          <section class="card">
+            <h2>风险雷达</h2>
+            <ul>
+              {% for item in result.rule_result.risks %}
+                <li class="risk">{{ item }}</li>
+              {% else %}
+                <li>暂无明显风险项。</li>
+              {% endfor %}
+            </ul>
+          </section>
+
+          <section class="card">
+            <h2>观察计划</h2>
+            <ul>
+              {% for item in result.rule_result.action_plan %}
+                <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          </section>
+
+          <section class="card">
+            <h2>数据边界</h2>
+            <ul>
+              {% for item in result.data_notes %}
+                <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          </section>
+        </div>
+      {% endif %}
+    </section>
+  </main>
+  {% if result %}
+  <script>
+    const historyKey = "tradingAssistantHistory";
+    const current = {
+      code: "{{ result.code }}",
+      name: "{{ result.name }}",
+      time: "{{ result.fetched_at }}"
+    };
+
+    function readHistory() {
+      try {
+        return JSON.parse(localStorage.getItem(historyKey) || "[]");
+      } catch {
+        return [];
+      }
+    }
+
+    const next = [current, ...readHistory().filter((item) => item.code !== current.code)].slice(0, 12);
+    localStorage.setItem(historyKey, JSON.stringify(next));
+
+    const chartData = {{ result.chart_json | safe }};
+    drawKlineChart(chartData);
+
+    function drawKlineChart(rows) {
+      const canvas = document.getElementById("klineChart");
+      const ctx = canvas.getContext("2d");
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+
+      const width = rect.width;
+      const height = rect.height;
+      const priceTop = 16;
+      const priceHeight = Math.round(height * 0.68);
+      const volumeTop = priceTop + priceHeight + 18;
+      const volumeHeight = height - volumeTop - 12;
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+
+      const prices = rows.flatMap((r) => [r.high, r.low, r.ma5, r.ma13, r.ma20]).filter((v) => v !== null);
+      const volumes = rows.map((r) => r.volume || 0);
+      const minPrice = Math.min(...prices);
+      const maxPrice = Math.max(...prices);
+      const maxVolume = Math.max(...volumes, 1);
+      const pad = (maxPrice - minPrice) * 0.08 || 1;
+      const low = minPrice - pad;
+      const high = maxPrice + pad;
+      const step = width / rows.length;
+
+      ctx.strokeStyle = "#e6eaf0";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 4; i++) {
+        const y = priceTop + (priceHeight / 3) * i;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+
+      rows.forEach((r, i) => {
+        const x = i * step + step / 2;
+        const openY = priceY(r.open);
+        const closeY = priceY(r.close);
+        const highY = priceY(r.high);
+        const lowY = priceY(r.low);
+        const up = r.close >= r.open;
+        ctx.strokeStyle = up ? "#d92d20" : "#16803c";
+        ctx.fillStyle = up ? "#d92d20" : "#16803c";
+        ctx.beginPath();
+        ctx.moveTo(x, highY);
+        ctx.lineTo(x, lowY);
+        ctx.stroke();
+        const bodyTop = Math.min(openY, closeY);
+        const bodyHeight = Math.max(Math.abs(closeY - openY), 2);
+        ctx.fillRect(x - Math.max(step * 0.25, 2), bodyTop, Math.max(step * 0.5, 3), bodyHeight);
+
+        const volHeight = (r.volume / maxVolume) * volumeHeight;
+        ctx.globalAlpha = 0.35;
+        ctx.fillRect(x - Math.max(step * 0.25, 2), volumeTop + volumeHeight - volHeight, Math.max(step * 0.5, 3), volHeight);
+        ctx.globalAlpha = 1;
+      });
+
+      drawLine("ma5", "#f59e0b");
+      drawLine("ma13", "#2563eb");
+      drawLine("ma20", "#7c3aed");
+
+      function priceY(value) {
+        return priceTop + ((high - value) / (high - low)) * priceHeight;
+      }
+
+      function drawLine(key, color) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        let started = false;
+        rows.forEach((r, i) => {
+          if (r[key] === null) return;
+          const x = i * step + step / 2;
+          const y = priceY(r[key]);
+          if (!started) {
+            ctx.moveTo(x, y);
+            started = true;
+          } else {
+            ctx.lineTo(x, y);
+          }
+        });
+        ctx.stroke();
+      }
+    }
+  </script>
+  {% endif %}
+</body>
+</html>
